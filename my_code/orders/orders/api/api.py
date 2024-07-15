@@ -1,6 +1,6 @@
-import time
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -14,12 +14,30 @@ from orders.api.schemas import (
     GetOrdersSchema
 )
 
-ORDERS = []
+orders = []
 
 
 @app.get('/orders', response_model=GetOrdersSchema)
-def get_orders():
-    return {'orders': ORDERS}
+def get_orders(cancelled: Optional[bool] = None, limit: Optional[int] = None):
+    if cancelled is None and limit is None:
+        return {'orders': orders}
+
+    query_set = [order for order in orders]
+
+    if cancelled is not None:
+        if cancelled:
+            query_set = [
+                order for order in query_set if order['status'] == 'cancelled'
+            ]
+        else:
+            query_set = [
+                order for order in query_set if order['status'] != 'cancelled'
+            ]
+
+    if limit is not None and len(query_set) > limit:
+        return {'orders': query_set[:limit]}
+
+    return {'orders': query_set}
 
 
 @app.post(
@@ -31,13 +49,13 @@ def create_order(order_details: CreateOrderSchema):
     order['id'] = uuid.uuid4()
     order['created'] = datetime.now(timezone.utc)
     order['status'] = 'created'
-    ORDERS.append(order)
+    orders.append(order)
     return order
 
 
 @app.get('/orders/{order_id}')
 def get_order(order_id: UUID):
-    for order in ORDERS:
+    for order in orders:
         if order['id'] == order_id:
             return order
     raise HTTPException(
@@ -47,7 +65,7 @@ def get_order(order_id: UUID):
 
 @app.put('/orders/{order_id}')
 def update_order(order_id: UUID, order_details: CreateOrderSchema):
-    for order in ORDERS:
+    for order in orders:
         if order['id'] == order_id:
             order.update(order_details.model_dump())
             return order
@@ -62,9 +80,9 @@ def update_order(order_id: UUID, order_details: CreateOrderSchema):
         response_class=Response
 )
 def delete_order(order_id: UUID):
-    for index, order in enumerate(ORDERS):
+    for index, order in enumerate(orders):
         if order['id'] == order_id:
-            ORDERS.pop(index)
+            orders.pop(index)
             return
     raise HTTPException(
         status_code=404, detail=f'Order with ID {order_id} not found'
@@ -73,7 +91,7 @@ def delete_order(order_id: UUID):
 
 @app.post('/orders/{order_id}/cancel', response_model=GetOrderSchema)
 def cancel_order(order_id: UUID):
-    for order in ORDERS:
+    for order in orders:
         if order['id'] == order_id:
             order['status'] = 'cancelled'
             return order
@@ -84,7 +102,7 @@ def cancel_order(order_id: UUID):
 
 @app.post('/orders/{order_id}/pay')
 def pay_order(order_id: UUID):
-    for order in ORDERS:
+    for order in orders:
         if order['id'] == order_id:
             order['status'] = 'progress'
             return order
