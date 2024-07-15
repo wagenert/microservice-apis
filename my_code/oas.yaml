@@ -1,4 +1,160 @@
+openapi: 3.0.3
+info:
+  title: Orders API 
+  description: API that allows you to manage orders for https://coffeemesh-dev.eu.auth
+  version: 1.0.0
+paths:
+  /orders:
+    get:
+      operationId: getOrder
+      responses:
+        '200':
+          description: A JSON array of orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items: 
+                      $ref: '#/components/schemas/GetOrderSchema'
+                required:
+                  - order
+      parameters:
+        - name: cancelled
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+    post:
+      operationId: createOrder
+      requestBody: 
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderSchema'
+      responses:
+        '201':
+          description: A JSON representation of the created order
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOrderSchema'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /orders/{order_id}:
+    parameters:
+      - in: path
+        name: order_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getOrder
+      responses:
+        '200':
+          description: OK
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOrderSchema'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderSchema'
+      responses:
+        '200':  
+          description: OK 
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/GetOrderSchema'
+    delete:
+      summary: Deletes an existing order
+      operationId: deleteOrder
+      responses:
+        '204':
+          description: The resource was deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /orders/{order_id}/pay:
+    parameters:
+      - in: path
+        name: order_id
+        required: true
+        schema: 
+          type: string
+          format: uuid
+    post:
+      summary: Processes payment for an order
+      operationId: payOrder
+      responses:
+        '200':  
+          description: OK 
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/GetOrderSchema'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/{order_id}/cancel:
+    parameters:
+      - in: path
+        name: order_id
+        required: true
+        schema: 
+          type: string
+          format: uuid
+    post:
+      summary: Cancels an order
+      operationId: cancelOrder
+      responses:
+        '200':  
+          description: OK 
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/GetOrderSchema'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+
 components:
+  responses:
+    NotFound:
+      description: The specified resource was not found.
+      content: 
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnprocessableEntity:
+      description: The payload contains invalid values.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
   schemas:
     OrderItemSchema:
       type: object
@@ -7,7 +163,7 @@ components:
         - size
       properties:
         product:
-          tpye: string
+          type: string
         size:
           type: string
           enum:
@@ -19,7 +175,7 @@ components:
           default: 1
           minimum: 1
 
-    CreateOderSchema:
+    CreateOrderSchema:
       type: object
       required:
         - order
@@ -55,3 +211,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemSchema'
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+        - detail
+
+  securitySchemes:
+    openId:
+      type: openIdConnect
+      openIdConnectUrl: https://coffeemesh-dev.eu.authß.com/.well-kown/openid-configuration
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://coffeemesh-dev.eu.auth0.com/oauth/token
+          scopes: {}
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - oauth2:
+    - getOrders
+    - createOrder
+    - getOrder
+    - updateOrder
+    - deleteOrder
+    - payOrder
+    - cancelOrder
+  - bearerAuth:
+    - getOrders
+    - createOrder
+    - getOrder
+    - updateOrder
+    - deleteOrder
+    - payOrder
+    - cancelOrder
+
