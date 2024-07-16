@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from starlette.responses import Response
 from starlette import status
 
-from orders.app import app
+from app import app
 from orders.api.schemas import (
     GetOrderSchema,
     CreateOrderSchema,
@@ -16,6 +16,10 @@ from orders.api.schemas import (
 
 orders = []
 
+@app.get("/url-list")
+def get_all_urls():
+    url_list = [{"path": route.path, "name": route.name} for route in app.routes]
+    return url_list
 
 @app.get('/orders', response_model=GetOrdersSchema)
 def get_orders(cancelled: Optional[bool] = None, limit: Optional[int] = None):
