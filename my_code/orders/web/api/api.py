@@ -8,7 +8,7 @@ from starlette.responses import Response
 from starlette import status
 
 from app import app
-from orders.api.schemas import (
+from schemas import (
     GetOrderSchema,
     CreateOrderSchema,
     GetOrdersSchema
@@ -16,10 +16,13 @@ from orders.api.schemas import (
 
 orders = []
 
+
 @app.get("/url-list")
 def get_all_urls():
-    url_list = [{"path": route.path, "name": route.name} for route in app.routes]
+    url_list = [{"path": route.path, "name": route.name}
+                for route in app.routes]
     return url_list
+
 
 @app.get('/orders', response_model=GetOrdersSchema)
 def get_orders(cancelled: Optional[bool] = None, limit: Optional[int] = None):
