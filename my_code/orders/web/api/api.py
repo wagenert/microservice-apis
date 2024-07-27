@@ -1,5 +1,3 @@
-import uuid
-from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -7,14 +5,16 @@ from fastapi import HTTPException
 from starlette.responses import Response
 from starlette import status
 
-from app import app
-from schemas import (
+from orders.orders_service.exceptions import OrderNotFoundError
+from orders.orders_service.orders_service import OrdersService
+from orders.repository.orders_repository import OrdersRepository
+from orders.repository.unit_of_work import UnitOfWork
+from orders.web.app import app
+from orders.web.api.schemas import (
     GetOrderSchema,
     CreateOrderSchema,
     GetOrdersSchema
 )
-
-orders = []
 
 
 @app.get("/url-list")
@@ -26,59 +26,66 @@ def get_all_urls():
 
 @app.get('/orders', response_model=GetOrdersSchema)
 def get_orders(cancelled: Optional[bool] = None, limit: Optional[int] = None):
-    if cancelled is None and limit is None:
-        return {'orders': orders}
 
-    query_set = [order for order in orders]
+    with UnitOfWork() as unit_of_work:
+        repo = OrdersRepository(unit_of_work.session)
+        orders_service = OrdersService(repo)
+        results = orders_service.list_orders(limit=limit, cancelled=cancelled)
 
-    if cancelled is not None:
-        if cancelled:
-            query_set = [
-                order for order in query_set if order['status'] == 'cancelled'
-            ]
-        else:
-            query_set = [
-                order for order in query_set if order['status'] != 'cancelled'
-            ]
-
-    if limit is not None and len(query_set) > limit:
-        return {'orders': query_set[:limit]}
-
-    return {'orders': query_set}
+    return {'orders': [result.dict() for result in results]}
 
 
 @app.post(
         '/orders',
         status_code=status.HTTP_201_CREATED,
         response_model=GetOrderSchema)
-def create_order(order_details: CreateOrderSchema):
-    order = order_details.model_dump()
-    order['id'] = uuid.uuid4()
-    order['created'] = datetime.now(timezone.utc)
-    order['status'] = 'created'
-    orders.append(order)
-    return order
+def create_order(payload: CreateOrderSchema):
+    with UnitOfWork() as unit_of_work:
+        repo = OrdersRepository(unit_of_work.session)
+        orders_service = OrdersService(repo)
+        order = orders_service.place_order(payload.model_dump()['order'])
+        order = payload.model_dump()['order']
+        for item in order:
+            item['size'] = item['size'].value
+        order = orders_service.place_order(order)
+
+        unit_of_work.commit()
+        return_payload = order.dict()
+    return return_payload
 
 
 @app.get('/orders/{order_id}')
 def get_order(order_id: UUID):
-    for order in orders:
-        if order['id'] == order_id:
-            return order
-    raise HTTPException(
-        status_code=404, detail=f'Order with ID {order_id} not found'
-    )
+    try:
+        with UnitOfWork() as unit_of_work:
+            repo = OrdersRepository(unit_of_work.session)
+            orders_service = OrdersService(repo)
+            order = orders_service.get_order(order_id=order_id)
+        return order.dict()
+    except OrderNotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f'Order with Id {order_id} not found'
+        )
 
 
 @app.put('/orders/{order_id}')
 def update_order(order_id: UUID, order_details: CreateOrderSchema):
-    for order in orders:
-        if order['id'] == order_id:
-            order.update(order_details.model_dump())
-            return order
-    raise HTTPException(
-        status_code=404, detail=f'Order with ID {order_id} not found'
-    )
+    try:
+        with UnitOfWork() as unit_of_work:
+            repo = OrdersRepository(unit_of_work.session)
+            orders_service = OrdersService(repo)
+            order = order_details.model_dump()['order']
+            for item in order:
+                item['size'] = item['size'].value
+            order = orders_service.update_order(
+                order_id=order_id, items=order
+            )
+            unit_of_work.commit()
+        return order.dict()
+    except OrderNotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f'Order with Id {order_id} not found'
+        )
 
 
 @app.delete(
@@ -87,32 +94,44 @@ def update_order(order_id: UUID, order_details: CreateOrderSchema):
         response_class=Response
 )
 def delete_order(order_id: UUID):
-    for index, order in enumerate(orders):
-        if order['id'] == order_id:
-            orders.pop(index)
-            return
-    raise HTTPException(
-        status_code=404, detail=f'Order with ID {order_id} not found'
-    )
+    try:
+        with UnitOfWork() as unit_of_work:
+            repo = OrdersRepository(unit_of_work.session)
+            orders_service = OrdersService(repo)
+            orders_service.delete_order(order_id=order_id)
+            unit_of_work.commit()
+        return
+    except OrderNotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f'Order with Id {order_id} not found'
+        )
 
 
 @app.post('/orders/{order_id}/cancel', response_model=GetOrderSchema)
 def cancel_order(order_id: UUID):
-    for order in orders:
-        if order['id'] == order_id:
-            order['status'] = 'cancelled'
-            return order
-    raise HTTPException(
-        status_code=404, detail=f'Order with ID {order_id} not found'
-    )
+    try:
+        with UnitOfWork() as unit_of_work:
+            repo = OrdersRepository(unit_of_work.session)
+            orders_service = OrdersService(repo)
+            order = orders_service.cancel_order(order_id=order_id)
+            unit_of_work.commit()
+        return order.dict()
+    except OrderNotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f'Order with Id {order_id} not found'
+        )
 
 
 @app.post('/orders/{order_id}/pay')
 def pay_order(order_id: UUID):
-    for order in orders:
-        if order['id'] == order_id:
-            order['status'] = 'progress'
-            return order
-    raise HTTPException(
-        status_code=404, detail=f'Order with ID {order_id} not found'
-    )
+    try:
+        with UnitOfWork() as unit_of_work:
+            repo = OrdersRepository(unit_of_work.session)
+            orders_service = OrdersService(repo)
+            order = orders_service.pay_order(order_id=order_id)
+            unit_of_work.commit()
+        return order.dict()
+    except OrderNotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f'Order with Id {order_id} not found'
+        )
