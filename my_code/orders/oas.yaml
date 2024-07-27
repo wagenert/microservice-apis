@@ -1,19 +1,38 @@
 openapi: 3.0.3
+
 info:
-  title: Orders API 
-  description: API that allows you to manage orders for https://coffeemesh-dev.eu.auth
+  title: Orders API
+  description: API that allows you to manage orders for CoffeeMesh
   version: 1.0.0
+
 servers:
   - url: http://localhost:8000
-    description: URL for local development and testing
-  - url: https://coffeemesh.com 
-    description: main production server 
+    description: local development server
+  - url: https://coffeemesh.com
+    description: main production server
   - url: https://coffeemesh-staging.com
-    description: staging server for testing puposes only
+    description: staging server for testing purposes only
+
 paths:
   /orders:
     get:
-      operationId: getOrder
+      parameters:
+      - name: cancelled
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      summary: Returns a list of orders
+      operationId: getOrders
+      description: >
+        A list of orders made by the customer
+        sorted by date. Allows to filter orders
+        by range of dates.
       responses:
         '200':
           description: A JSON array of orders
@@ -21,27 +40,19 @@ paths:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
                 properties:
                   orders:
                     type: array
-                    items: 
+                    items:
                       $ref: '#/components/schemas/GetOrderSchema'
-                required:
-                  - order
-      parameters:
-        - name: cancelled
-          in: query
-          required: false
-          schema:
-            type: boolean
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
     post:
+      summary: Creates an order
       operationId: createOrder
-      requestBody: 
+      requestBody:
         required: true
         content:
           application/json:
@@ -50,7 +61,7 @@ paths:
       responses:
         '201':
           description: A JSON representation of the created order
-          content: 
+          content:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetOrderSchema'
@@ -66,17 +77,22 @@ paths:
           type: string
           format: uuid
     get:
+      summary: Returns the details of a specific order
       operationId: getOrder
       responses:
         '200':
           description: OK
-          content: 
+          content:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetOrderSchema'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
     put:
+      summary: Replaces an existing order
       operationId: updateOrder
       requestBody:
         required: true
@@ -85,12 +101,17 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateOrderSchema'
       responses:
-        '200':  
-          description: OK 
+        '200':
+          description: OK
           content:
             application/json:
-              schema: 
-                $ref: '#/components/schemas/GetOrderSchema'
+              schema:
+                $ref:  '#/components/schemas/GetOrderSchema'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
     delete:
       summary: Deletes an existing order
       operationId: deleteOrder
@@ -107,39 +128,18 @@ paths:
       - in: path
         name: order_id
         required: true
-        schema: 
+        schema:
           type: string
           format: uuid
     post:
       summary: Processes payment for an order
       operationId: payOrder
       responses:
-        '200':  
-          description: OK 
+        '200':
+          description: OK
           content:
             application/json:
-              schema: 
-                $ref: '#/components/schemas/GetOrderSchema'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /orders/{order_id}/cancel:
-    parameters:
-      - in: path
-        name: order_id
-        required: true
-        schema: 
-          type: string
-          format: uuid
-    post:
-      summary: Cancels an order
-      operationId: cancelOrder
-      responses:
-        '200':  
-          description: OK 
-          content:
-            application/json:
-              schema: 
+              schema:
                 $ref: '#/components/schemas/GetOrderSchema'
         '404':
           $ref: '#/components/responses/NotFound'
@@ -147,11 +147,34 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
 
 
+  /orders/{order_id}/cancel:
+    parameters:
+      - in: path
+        name: order_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Cancels an order
+      operationId: cancelOrder
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOrderSchema'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
 components:
   responses:
     NotFound:
       description: The specified resource was not found.
-      content: 
+      content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
@@ -162,8 +185,35 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
 
+  securitySchemes:
+    openId:
+      type: openIdConnect
+      openIdConnectUrl: https://coffeemesh-dev.eu.auth0.com/.well-known/openid-configuration
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://coffeemesh-dev.eu.auth0.com/oauth/token
+          scopes: {}
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
+    Error:
+      type: object
+      properties:
+        detail:
+          oneOf:
+            - type: string
+            - type: array
+      required:
+        - detail
+      additionalProperties: false
+
     OrderItemSchema:
+      additionalProperties: false
       type: object
       required:
         - product
@@ -179,10 +229,13 @@ components:
             - big
         quantity:
           type: integer
+          format: int64
           default: 1
           minimum: 1
+          maximum: 1000000
 
     CreateOrderSchema:
+      additionalProperties: false
       type: object
       required:
         - order
@@ -197,10 +250,10 @@ components:
       additionalProperties: false
       type: object
       required:
-        - order
         - id
         - created
         - status
+        - order
       properties:
         id:
           type: string
@@ -212,52 +265,31 @@ components:
           type: string
           enum:
             - created
+            - paid
             - progress
             - cancelled
             - dispatched
             - delivered
         order:
           type: array
+          minItems: 1
           items:
             $ref: '#/components/schemas/OrderItemSchema'
-    Error:
-      type: object
-      properties:
-        detail:
-          type: string
-      required:
-        - detail
-
-  securitySchemes:
-    openId:
-      type: openIdConnect
-      openIdConnectUrl: https://coffeemesh-dev.eu.authß.com/.well-kown/openid-configuration
-    oauth2:
-      type: oauth2
-      flows:
-        clientCredentials:
-          tokenUrl: https://coffeemesh-dev.eu.auth0.com/oauth/token
-          scopes: {}
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
 
 security:
   - oauth2:
-    - getOrders
-    - createOrder
-    - getOrder
-    - updateOrder
-    - deleteOrder
-    - payOrder
-    - cancelOrder
+      - getOrders
+      - createOrder
+      - getOrder
+      - updateOrder
+      - deleteOrder
+      - payOrder
+      - cancelOrder
   - bearerAuth:
-    - getOrders
-    - createOrder
-    - getOrder
-    - updateOrder
-    - deleteOrder
-    - payOrder
-    - cancelOrder
-
+      - getOrders
+      - createOrder
+      - getOrder
+      - updateOrder
+      - deleteOrder
+      - payOrder
+      - cancelOrder
