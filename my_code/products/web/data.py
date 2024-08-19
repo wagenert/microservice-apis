@@ -6,7 +6,7 @@ ingredients = [
         'name': 'Milk',
         'stock': {
             'quantity': 100.00,
-            'unit': 'LITRES'
+            'unit': 'LITERS'
         },
         'supplier': '92f2daae-a4f8-4aae-8d74-51dd74e5de6d',
         'products': [],
@@ -26,7 +26,7 @@ products = [
             {
                 'ingredient': '602f2ab3-97bd-468e-a88b-bb9e00531fd0',
                 'quantity': 100.00,
-                'unit': 'LITRES',
+                'unit': 'LITERS',
             }
         ],
         'hasFilling': False,
@@ -43,11 +43,19 @@ products = [
             {
                 'ingredient': '602f2ab3-97bd-468e-a88b-bb9e00531fd0',
                 'quantity': 100.00,
-                'unit': 'LITRES',
+                'unit': 'LITERS',
             }
         ],
         'hasCreamOnTopOption': True,
         'hasServeOnIceOption': True,
         'lastUpdated': datetime.utcnow(),
     },
+]
+
+ingredients = [
+  {
+    'ingredient': '602f2ab3-97bd-468e-a88b-bb9e00531fd0',
+    'quantity': 100.00,
+    'unit': 'LITERS',
+  }
 ]
