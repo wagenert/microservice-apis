@@ -51,11 +51,3 @@ products = [
         'lastUpdated': datetime.utcnow(),
     },
 ]
-
-ingredients = [
-  {
-    'ingredient': '602f2ab3-97bd-468e-a88b-bb9e00531fd0',
-    'quantity': 100.00,
-    'unit': 'LITERS',
-  }
-]
