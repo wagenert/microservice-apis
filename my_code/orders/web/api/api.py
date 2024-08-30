@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from starlette.responses import Response
 from starlette import status
+from requests import Request
 
 from orders.orders_service.exceptions import OrderNotFoundError
 from orders.orders_service.orders_service import OrdersService
@@ -25,7 +26,11 @@ def get_all_urls():
 
 
 @app.get('/orders', response_model=GetOrdersSchema)
-def get_orders(cancelled: Optional[bool] = None, limit: Optional[int] = None):
+def get_orders(
+    request: Request,
+    cancelled: Optional[bool] = None,
+    limit: Optional[int] = None
+):
 
     with UnitOfWork() as unit_of_work:
         repo = OrdersRepository(unit_of_work.session)
@@ -39,7 +44,7 @@ def get_orders(cancelled: Optional[bool] = None, limit: Optional[int] = None):
         '/orders',
         status_code=status.HTTP_201_CREATED,
         response_model=GetOrderSchema)
-def create_order(payload: CreateOrderSchema):
+def create_order(request: Request, payload: CreateOrderSchema):
     with UnitOfWork() as unit_of_work:
         repo = OrdersRepository(unit_of_work.session)
         orders_service = OrdersService(repo)
@@ -55,12 +60,15 @@ def create_order(payload: CreateOrderSchema):
 
 
 @app.get('/orders/{order_id}')
-def get_order(order_id: UUID):
+def get_order(request: Request, order_id: UUID):
     try:
         with UnitOfWork() as unit_of_work:
             repo = OrdersRepository(unit_of_work.session)
             orders_service = OrdersService(repo)
-            order = orders_service.get_order(order_id=order_id)
+            order = orders_service.get_order(
+                order_id=order_id,
+                user_id=request.state.user_id
+            )
         return order.dict()
     except OrderNotFoundError:
         raise HTTPException(

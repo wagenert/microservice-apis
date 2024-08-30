@@ -1,18 +1,16 @@
-# from repository.orders_repository import OrdersRepository
-
-
+from repository.orders_repository import OrdersRepository
 from orders.orders_service.exceptions import OrderNotFoundError
 
 
 class OrdersService:
-    def __init__(self, orders_repository):
+    def __init__(self, orders_repository:OrdersRepository):
         self.orders_repository = orders_repository
 
-    def place_order(self, items):
-        return self.orders_repository.add(items)
+    def place_order(self, items, user_id):
+        return self.orders_repository.add(items, user_id)
 
-    def get_order(self, order_id):
-        order = self.orders_repository.get(order_id)
+    def get_order(self, order_id, **filters):
+        order = self.orders_repository.get(order_id, **filters)
         if order is not None:
             return order
         raise OrderNotFoundError(f'Order with id {order_id} not found')
